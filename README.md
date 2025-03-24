@@ -147,9 +147,118 @@ We can always refer to the docs for more help: https://docs.gitea.com/category/i
         - gitea
   ```
 
-  - Here keep in mind the gitea server must run first and only can we access the token.
-  - The gitea server url must either be the name of the service that gitea is running, for instance: http://server:3000 , which is the name of the compose service or the name of the container, for instance: http://        gitea:3000 as per the docker-compose file. Or it can be the private ip address of your host machine.  
+  - Here keep in mind the gitea server must run first and only we can access the token.
+  - The gitea server url must either be the name of the service that gitea is running, for instance: http://server:3000 , which is the name of the compose service or the name of the container, for instance: http://        gitea:3000 as per the docker-compose file. Or it can be the private ip address of your host machine.
+ 
+  - For the actions to work, the repo needs to have a directory structure as ```.gitea/workflows``` where we can add a yml file with the pipeline actions.
+ 
+    <img width="1630" alt="Screenshot 2025-03-24 at 12 57 31" src="https://github.com/user-attachments/assets/2d63c2b6-8308-47d3-9f53-f5eea6311b7e" />
 
+  - Sample actions:
+ 
+    ```
+    name: Gitea Actions Demo
+    run-name: ${{ gitea.actor }} is testing out Gitea Actions 🚀
+    on: [push]
+    
+    jobs:
+      Explore-Gitea-Actions:
+        runs-on: ubuntu-latest
+        steps:
+          - run: echo "🎉 The job was automatically triggered by a ${{ gitea.event_name }} event."
+          - run: echo "🐧 This job is now running on a ${{ runner.os }} server hosted by Gitea!"
+          - run: echo "🔎 The name of your branch is ${{ gitea.ref }} and your repository is ${{ gitea.repository }}."
+          - name: Check out repository code
+            uses: actions/checkout@v4
+          - run: echo "💡 The ${{ gitea.repository }} repository has been cloned to the runner."
+          - run: echo "🖥️ The workflow is now ready to test your code on the runner."
+          - name: List files in the repository
+            run: |
+              ls ${{ gitea.workspace }}
+          - run: echo "🍏 This job's status is ${{ job.status }}."
+    ```
+  - This action is triggered on push to the remote repo.
+ 
+  - After commiting and pushing the changes, the actions must be triggered.
+    <img width="1677" alt="Screenshot 2025-03-24 at 13 04 50" src="https://github.com/user-attachments/assets/8d11459f-0ffa-4ee4-afa1-1ba56c26f687" />
+
+  - But the job didnot succeed as it sent the following error:
+    <img width="1679" alt="Screenshot 2025-03-24 at 13 05 28" src="https://github.com/user-attachments/assets/164e4fd6-a11f-4821-8805-f0ff5fd1a2c2" />
+  - The error is seen because the ``` runs-on: ubuntu-latest ``` will launch a new docker container which will be deleted after it's operation automatically and while doing so, the container is run on seperate
+    network than the gitea and gitea runner so, we need to setup a custom configuration file called config.yaml, so to generate the file:
+
+    ```
+    docker run --entrypoint="" --rm -it docker.io/gitea/act_runner:latest act_runner generate-config > config.yaml
+    ```
+  - This command will generate a config.yaml file on our host and we can mount it to the volume of the container. So the config file becomes:
+
+    ```
+    runner:
+      image: docker.io/gitea/act_runner:nightly
+      environment:
+        CONFIG_FILE: /config.yaml
+        GITEA_INSTANCE_URL: "http://gitea:3000"
+        GITEA_RUNNER_REGISTRATION_TOKEN: "zzTAk2hBVShVESnqZz4XW5l1ZVLNVv3zHop9yowX"
+        GITEA_RUNNER_NAME: "runner-1"
+      volumes:
+        - ./config.yaml:/config.yaml
+        - ./data:/data
+        - /var/run/docker.sock:/var/run/docker.sock
+      networks:
+        - gitea
+    ```
+
+  - Here the line ``` CONFIG_FILE ``` under ``` environment ``` and ``` - ./config.yaml ``` on ``` volumes ``` is added .
+  - Change the configuration of the config.yaml, navigate to the network part and add in the name of the network your gitea and gitea-runner are running on, for this docs it's gitea.
+    <img width="1672" alt="Screenshot 2025-03-24 at 13 18 50" src="https://github.com/user-attachments/assets/b6aed6d1-255d-40ef-990b-35fb59c85221" />
+  - Make sure to externally create the network named gitea. 
+  - Now restart the runner.
+  - This time it should work as expected and the setup is complete.
+
+    <img width="1679" alt="Screenshot 2025-03-24 at 13 33 19" src="https://github.com/user-attachments/assets/e2372867-a2cf-4093-a392-85699bcfa65d" />
+
+  - If it doesnot work while running try resetting up the whole process once again with the config.yaml file. The final compose file is:
+
+    ```
+    version: "3"
+    networks:
+      gitea:
+        external: true
+    services:
+      server:
+        image: docker.gitea.com/gitea:1.23.5
+        container_name: gitea
+        environment:
+          - USER_UID=1000
+          - USER_GID=1000
+        restart: always
+        networks:
+          - gitea
+        volumes:
+          - ./gitea:/data
+          - /etc/timezone:/etc/timezone:ro
+          - /etc/localtime:/etc/localtime:ro
+        ports:
+          - "3000:3000"
+          - "222:22"
+      runner:
+        image: docker.io/gitea/act_runner:nightly
+        environment:
+          CONFIG_FILE: /config.yaml
+          GITEA_INSTANCE_URL: "http://server:3000"
+          GITEA_RUNNER_REGISTRATION_TOKEN: "LePucjxzediYIE4PlTquywxRsxy54dPcdW3NUqm8"
+          GITEA_RUNNER_NAME: "runner-1"
+        volumes:
+          - ./config.yaml:/config.yaml
+          - ./data:/data
+          - /var/run/docker.sock:/var/run/docker.sock
+        networks:
+          - gitea
+    ```    
+ 
+  ### Note: There wouldnot have been any problem if the private ip of the host machine was used or any other publicly accessable domains. 
+
+    
   
 
 
