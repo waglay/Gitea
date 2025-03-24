@@ -90,7 +90,7 @@ We can always refer to the docs for more help: https://docs.gitea.com/category/i
 
   <img width="1680" alt="Screenshot 2025-03-24 at 12 31 27" src="https://github.com/user-attachments/assets/d9ce024a-2e47-428a-97f5-4b2d4826c354" />
 
-  *** it can be accessed by clicking on the drop down on your avatar no top right hand side ***
+  *** it can be accessed by clicking on the drop down on your avatar on top right hand side ***
 
 - Now navigate to ``` actions -> runners-> create a new runner ```
   <img width="1680" alt="Screenshot 2025-03-24 at 12 38 50" src="https://github.com/user-attachments/assets/0264a591-c323-4396-9b62-69aab5196b89" />
